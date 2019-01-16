@@ -17,9 +17,11 @@ defmodule ExTypes.Spec do
   # an atom is an atom is an atom
   def t_to_quote({:c, :atom, atom, _qualifier}) when is_atom(atom), do: {atom, [], []}
   def t_to_quote({:c, :atom, [atom], _qualifier}), do: atom
-  def t_to_quote({:c, :atom, atom_list, _qualifier}) when is_list(atom_list), do: quote_union(atom_list)
 
-  def t_to_quote({:c, :number, {:int_rng, 0, 1114111}, :integer}), do: {:char, [], []}
+  def t_to_quote({:c, :atom, atom_list, _qualifier}) when is_list(atom_list),
+    do: quote_union(atom_list)
+
+  def t_to_quote({:c, :number, {:int_rng, 0, 1_114_111}, :integer}), do: {:char, [], []}
 
   # binaries become `binary()`
   def t_to_quote({:c, :binary, _elements, _qualifier}), do: {:binary, [], []}
@@ -70,28 +72,30 @@ defmodule ExTypes.Spec do
 
   def spec(fun, t_domain, t_range) do
     {:@, [context: Elixir, import: Kernel],
-      [
-        {:spec, [context: Elixir],
-          [
-            {:::, [],
-              [
-                {fun, [], Enum.map(t_domain, &t_to_quote/1)},
-                t_to_quote(t_range)
-              ]}
-          ]}
-      ]}
+     [
+       {:spec, [context: Elixir],
+        [
+          {:::, [],
+           [
+             {fun, [], Enum.map(t_domain, &t_to_quote/1)},
+             t_to_quote(t_range)
+           ]}
+        ]}
+     ]}
   end
 
-  def iolist(fun, t_domain, t_range) do
+  @default_line_length 80
+
+  def iolist(fun, t_domain, t_range, line_length \\ @default_line_length) do
     fun
     |> spec(t_domain, t_range)
     |> Macro.to_string()
-    |> Code.format_string!()
+    |> Code.format_string!(line_length: line_length)
   end
 
-  def string(fun, t_domain, t_range) do
+  def string(fun, t_domain, t_range, line_length \\ @default_line_length) do
     fun
-    |> iolist(t_domain, t_range)
+    |> iolist(t_domain, t_range, line_length)
     |> List.flatten()
     |> Enum.join("")
   end
