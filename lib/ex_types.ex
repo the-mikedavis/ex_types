@@ -1,18 +1,5 @@
 defmodule ExTypes do
   @moduledoc """
-  Documentation for ExTypes.
+  Functions that convert erl_types to elixir types
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> ExTypes.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 end
