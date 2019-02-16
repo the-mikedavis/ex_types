@@ -14,22 +14,32 @@ defmodule ExTypes.Spec do
   # integers are integers
   def t_to_quote(t) when is_number(t), do: t
 
+  @raw_types [:atom, :identifier]
+
   # an atom is an atom is an atom
   def t_to_quote({:c, :atom, atom, _qualifier}) when is_atom(atom), do: {atom, [], []}
-  def t_to_quote({:c, :atom, [atom], _qualifier}), do: atom
+  def t_to_quote({:c, type, [atom], _qualifier}) when type in @raw_types, do: atom
 
   def t_to_quote({:c, :atom, atom_list, _qualifier}) when is_list(atom_list),
     do: quote_union(atom_list)
 
   def t_to_quote({:c, :number, {:int_rng, 0, 1_114_111}, :integer}), do: {:char, [], []}
+  def t_to_quote({:c, :number, {:int_rng, 0, :pos_inf}, :integer}), do: {:non_neg_integer, [], []}
 
   # binaries become `binary()`
   def t_to_quote({:c, :binary, _elements, _qualifier}), do: {:binary, [], []}
 
   def t_to_quote({:c, :tuple, elements, _qualifier}), do: {:{}, [], quote_elements(elements)}
 
-  # not a real type but whatever
-  def t_to_quote({:c, :tuple_set, [{_arity, elements}], _qualifier}), do: quote_elements(elements)
+  # printed out as a union in erl_types
+  def t_to_quote({:c, :tuple_set, [{_arity, elements}], _qualifier}), do: quote_union(elements)
+
+  # special case of a list: a char list
+  def t_to_quote(
+        {:c, :list, [{:c, :number, {:int_rng, 0, 1_114_111}, :integer}, {:c, nil, [], :unknown}],
+         _qualifier}
+      ),
+      do: {:charlist, [], []}
 
   # we can be pretty accurate here and look for improper lists
   # (those that don't end in the nil list element)
@@ -43,6 +53,14 @@ defmodule ExTypes.Spec do
 
   # empty cons cell
   def t_to_quote({:c, nil, [], _qualifier}), do: []
+
+  # gotta catch the structs
+  def t_to_quote(
+        {:c, :map,
+         {[{{:c, :atom, [:__struct__], _}, _, {:c, :atom, [struct], _}} | _other_keys], _def_key,
+          _def_val}, _qualifier}
+      ),
+      do: {:%, [], [{:__aliases__, [alias: false], [strip_elixir(struct)]}, {:%{}, [], []}]}
 
   def t_to_quote({:c, :map, {_pairs, _def_key, _def_val}, _qualifier}), do: {:map, [], []}
 
@@ -70,6 +88,18 @@ defmodule ExTypes.Spec do
   defp is_none?(:none), do: true
   defp is_none?(_), do: false
 
+  defp strip_elixir(module) when is_atom(module) do
+    module
+    |> Atom.to_string()
+    |> String.split(".")
+    |> case do
+         ["Elixir" | rest] -> rest
+         parts -> parts
+    end
+    |> Enum.join(".")
+    |> String.to_atom()
+  end
+
   def spec(fun, t_domain, t_range) do
     {:@, [context: Elixir, import: Kernel],
      [
@@ -84,12 +114,13 @@ defmodule ExTypes.Spec do
      ]}
   end
 
-  @default_line_length 80
+  @default_line_length 99
 
   def iolist(fun, t_domain, t_range, line_length \\ @default_line_length) do
     fun
     |> spec(t_domain, t_range)
     |> Macro.to_string()
+    |> IO.inspect()
     |> Code.format_string!(line_length: line_length)
   end
 
