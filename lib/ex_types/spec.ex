@@ -93,8 +93,8 @@ defmodule ExTypes.Spec do
     |> Atom.to_string()
     |> String.split(".")
     |> case do
-         ["Elixir" | rest] -> rest
-         parts -> parts
+      ["Elixir" | rest] -> rest
+      parts -> parts
     end
     |> Enum.join(".")
     |> String.to_atom()
